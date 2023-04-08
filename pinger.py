@@ -1,5 +1,5 @@
 from socket import *
-import os
+import oss
 import sys
 import struct
 import time
