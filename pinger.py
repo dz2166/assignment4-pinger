@@ -7,6 +7,7 @@ import select
 import binascii
 import pandas as pd
 import warnings
+import statistics
 
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
@@ -49,18 +50,20 @@ def receiveOnePing(mySocket, ID, timeout, destAddr):
         timeReceived = time.time()
         recPacket, addr = mySocket.recvfrom(1024)
 
-        # Fill in start
         # Fetch the ICMP header from the IP packet
-        header = recPacket[20:28]
+        icmpHeader = recPacket[20:28]
+
+        # Unpack ICMP header
         type, code, checksum, packetID, sequence = struct.unpack(
-            "bbHHh", header)
+            "bbHHh", icmpHeader
+        )
 
         if packetID == ID:
             bytes = len(recPacket) - 28
-            ttl = struct.unpack("B", recPacket[8:9])[0]
             rtt = (timeReceived - time.time()) * 1000
+            ttl = ord(struct.unpack("c", recPacket[8:9])[0])
             return bytes, rtt, ttl
-        # Fill in end
+
         timeLeft = timeLeft - howLongInSelect
         if timeLeft <= 0:
             return "Request timed out."
@@ -114,42 +117,39 @@ def ping(host, timeout=1):
     print("\nPinging " + dest + " using Python:")
     print("")
 
-    response = pd.DataFrame(columns=['bytes', 'rtt', 'ttl'])
+    response = pd.DataFrame(columns=['bytes', 'rtt', 'ttl'])  # This creates an empty dataframe with 3 headers with the column specific names declared
+    delays = []  # Add an empty list to collect delays of each ping
 
-    delays = []  # Create an empty list to store the delays of each ping
-
-    for i in range(0, 4):
-        delay, statistics = doOnePing(dest, timeout)
-        response = response.append({'bytes': len(statistics), 'rtt': delay, 'ttl': statistics[0]}, ignore_index=True)
-        delays.append(delay)  # Append the delay of each ping to the list
+    # Send ping requests to a server separated by approximately one second
+    for i in range(0, 4):  # Four pings will be sent (loop runs for i=0, 1, 2, 3)
+        delay, statistics = doOnePing(dest, timeout)  # what is stored into delay and statistics?
+        delays.append(delay)  # Append the delay to the list of delays
+        response = response.append({'bytes': statistics[0], 'rtt': delay, 'ttl': statistics[1]}, ignore_index=True)  # Add the statistics to the response DataFrame
         print(delay)
-        time.sleep(1)
+        time.sleep(1)  # wait one second
 
     packet_lost = 0
     packet_recv = 0
-    # fill in start
+    # Check if each packet was received or lost
     for index, row in response.iterrows():
-        if row['bytes'] == 0:
+        if row['rtt'] == '*':  # Check if the rtt value is '*'
             packet_lost += 1
         else:
             packet_recv += 1
-    # fill in end
-    # Calculate the statistics of the delays
-    packet_min = min(delays)
-    packet_avg = sum(delays) / len(delays)
-    packet_max = max(delays)
-    stdev = np.std(delays)
 
-    vars = pd.DataFrame(columns=['min', 'avg', 'max', 'stddev'])
-    vars = vars.append({'min': str(round(packet_min, 2)), 'avg': str(round(packet_avg, 2)),
-                        'max': str(round(packet_max, 2)), 'stddev': str(round(stdev, 2))},
-                       ignore_index=True)
-    print(vars)
+    # Calculate packet statistics
+    packet_min = response['rtt'].min()
+    packet_avg = response['rtt'].mean()
+    packet_max = response['rtt'].max()
+    packet_stdev = response['rtt'].std()
+
+    # Create a DataFrame with packet statistics
+    vars = pd.DataFrame({'min': [packet_min], 'avg': [packet_avg], 'max': [packet_max], 'stddev': [packet_stdev]})
+
+    print(vars)  # make sure your vars data you are returning resembles acceptance criteria
     return vars
 
 
 if __name__ == '__main__':
     ping("google.com")
-
-
 
