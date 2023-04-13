@@ -41,24 +41,38 @@ def receiveOnePing(mySocket, ID, timeout, destAddr):
 
     while True:
         startedSelect = time.time()
-        whatReady = select([mySocket], [], [], timeLeft)
-        howLongInSelect = (time.time() - startedSelect)
+        # Handles a timeout case
+        whatReady = select.select([mySocket], [], [], timeLeft)
+        elapsedSelect = (time.time() - startedSelect)
+
+        # Handles a timeout case
         if whatReady[0] == []:  # Timeout
-            return None, None
+            print("Timeout")
+            return None, None, None
 
         timeReceived = time.time()
         recPacket, addr = mySocket.recvfrom(1024)
 
-        # Extract the ICMP header from the IP packet
-        header = recPacket[20:28]
-        stats = struct.unpack("bbHHh", header)
+        # Compare the ID returned with the ID we sent
+        icmpHeader = recPacket[20:28]
+        icmpType, code, checksum, packetID, sequence = struct.unpack(
+            "bbHHh", icmpHeader
+        )
 
-        if stats[1] == 0:  # Echo Reply
-            delay = (timeReceived - time.time()) * 1000
-            return delay, stats
-        timeLeft -= howLongInSelect
+        if icmpType == 0 and packetID == ID:
+            bytes = len(recPacket) - 28
+            rtt = (timeReceived - time.time()) * 1000
+            ttl = struct.unpack("B", recPacket[8:9])[0]
+
+            print(f"{bytes} bytes from {addr[0]}: icmp_seq={sequence} ttl={ttl} time={rtt} ms")
+
+            return bytes, rtt, ttl
+
+        timeLeft = timeLeft - elapsedSelect
         if timeLeft <= 0:
-            return None, None
+            print("Timeout")
+            return None, None, None
+
 
 
 def sendOnePing(mySocket, destAddr, ID):
