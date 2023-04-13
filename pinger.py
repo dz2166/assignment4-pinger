@@ -39,7 +39,7 @@ def checksum(string):
 def receiveOnePing(mySocket, ID, timeout, destAddr):
     timeLeft = timeout
 
-    while True:
+    while 1:
         startedSelect = time.time()
         whatReady = select.select([mySocket], [], [], timeLeft)
         howLongInSelect = (time.time() - startedSelect)
