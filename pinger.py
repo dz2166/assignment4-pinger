@@ -39,40 +39,31 @@ def checksum(string):
 def receiveOnePing(mySocket, ID, timeout, destAddr):
     timeLeft = timeout
 
-    while True:
+    while 1:
         startedSelect = time.time()
-        # Handles a timeout case
         whatReady = select.select([mySocket], [], [], timeLeft)
-        elapsedSelect = (time.time() - startedSelect)
-
-        # Handles a timeout case
+        howLongInSelect = (time.time() - startedSelect)
         if whatReady[0] == []:  # Timeout
-            print("Timeout")
-            return None, None, None
+            return "Request timed out."
 
         timeReceived = time.time()
         recPacket, addr = mySocket.recvfrom(1024)
 
-        # Compare the ID returned with the ID we sent
-        icmpHeader = recPacket[20:28]
-        icmpType, code, checksum, packetID, sequence = struct.unpack(
-            "bbHHh", icmpHeader
-        )
+        # Fill in start
+        # Fetch the ICMP header from the IP packet
+        header = recPacket[20:28]
+        type, code, checksum, packetID, sequence = struct.unpack(
+            "bbHHh", header)
 
-        if icmpType == 0 and packetID == ID:
+        if packetID == ID:
             bytes = len(recPacket) - 28
-            rtt = (timeReceived - time.time()) * 1000
             ttl = struct.unpack("B", recPacket[8:9])[0]
-
-            print(f"{bytes} bytes from {addr[0]}: icmp_seq={sequence} ttl={ttl} time={rtt} ms")
-
+            rtt = (timeReceived - time.time()) * 1000
             return bytes, rtt, ttl
-
-        timeLeft = timeLeft - elapsedSelect
+        # Fill in end
+        timeLeft = timeLeft - howLongInSelect
         if timeLeft <= 0:
-            print("Timeout")
-            return None, None, None
-
+            return "Request timed out."
 
 
 def sendOnePing(mySocket, destAddr, ID):
@@ -110,10 +101,10 @@ def doOnePing(destAddr, timeout):
     mySocket = socket(AF_INET, SOCK_RAW, icmp)
 
     myID = os.getpid() & 0xFFFF  # Return the current process i
-    delay, statistics = sendOnePing(mySocket, destAddr, myID)
-    delay, statistics = receiveOnePing(mySocket, myID, timeout, destAddr)
+    sendOnePing(mySocket, destAddr, myID)
+    delay = receiveOnePing(mySocket, myID, timeout, destAddr)
     mySocket.close()
-    return delay, statistics
+    return delay
 
 
 def ping(host, timeout=1):
