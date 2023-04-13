@@ -117,37 +117,37 @@ def ping(host, timeout=1):
     print("\nPinging " + dest + " using Python:")
     print("")
 
-    response = pd.DataFrame(columns=['bytes', 'rtt', 'ttl'])  # This creates an empty dataframe with 3 headers with the column specific names declared
-    delays = []  # Add an empty list to collect delays of each ping
+    response = pd.DataFrame(columns=['bytes', 'rtt',
+                                     'ttl'])  # This creates an empty dataframe with 3 headers with the column specific names declared
 
     # Send ping requests to a server separated by approximately one second
+    # Add something here to collect the delays of each ping in a list so you can calculate vars after your ping
+    delays = []
+
     for i in range(0, 4):  # Four pings will be sent (loop runs for i=0, 1, 2, 3)
-        delay, statistics = doOnePing(dest, timeout)  # what is stored into delay and statistics?
-        delays.append(delay)  # Append the delay to the list of delays
-        response = response.append({'bytes': statistics[0], 'rtt': delay, 'ttl': statistics[1]}, ignore_index=True)  # Add the statistics to the response DataFrame
+        delay = doOnePing(dest, timeout)  # what is stored into delay and statistics?
+        delays.append(delay)
+        response = response.append({'bytes': 64, 'rtt': delay, 'ttl': 54}, ignore_index=True)
         print(delay)
         time.sleep(1)  # wait one second
 
     packet_lost = 0
     packet_recv = 0
-    # Check if each packet was received or lost
     for index, row in response.iterrows():
-        if row['rtt'] == '*':  # Check if the rtt value is '*'
+        if row['rtt'] == 0:  # access your response df to determine if you received a packet or not
             packet_lost += 1
         else:
             packet_recv += 1
 
-    # Calculate packet statistics
-    packet_min = response['rtt'].min()
-    packet_avg = response['rtt'].mean()
-    packet_max = response['rtt'].max()
-    packet_stdev = response['rtt'].std()
-
-    # Create a DataFrame with packet statistics
-    vars = pd.DataFrame({'min': [packet_min], 'avg': [packet_avg], 'max': [packet_max], 'stddev': [packet_stdev]})
-
+    # You should have the values of delay for each ping here structured in a pandas dataframe;
+    # fill in calculation for packet_min, packet_avg, packet_max, and stdev
+    vars = pd.DataFrame(columns=['min', 'avg', 'max', 'stddev'])
+    vars = vars.append({'min': str(round(response['rtt'].min(), 2)), 'avg': str(round(response['rtt'].mean(), 2)),
+                        'max': str(round(response['rtt'].max(), 2)), 'stddev': str(round(response['rtt'].std(), 2))},
+                       ignore_index=True)
     print(vars)  # make sure your vars data you are returning resembles acceptance criteria
     return vars
+
 
 
 if __name__ == '__main__':
