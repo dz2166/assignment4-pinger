@@ -39,31 +39,26 @@ def checksum(string):
 def receiveOnePing(mySocket, ID, timeout, destAddr):
     timeLeft = timeout
 
-    while 1:
+    while True:
         startedSelect = time.time()
-        whatReady = select.select([mySocket], [], [], timeLeft)
+        whatReady = select([mySocket], [], [], timeLeft)
         howLongInSelect = (time.time() - startedSelect)
         if whatReady[0] == []:  # Timeout
-            return "Request timed out."
+            return None, None
 
         timeReceived = time.time()
         recPacket, addr = mySocket.recvfrom(1024)
 
-        # Fill in start
-        # Fetch the ICMP header from the IP packet
+        # Extract the ICMP header from the IP packet
         header = recPacket[20:28]
-        type, code, checksum, packetID, sequence = struct.unpack(
-            "bbHHh", header)
+        stats = struct.unpack("bbHHh", header)
 
-        if packetID == ID:
-            bytes = len(recPacket) - 28
-            ttl = struct.unpack("B", recPacket[8:9])[0]
-            rtt = (timeReceived - time.time()) * 1000
-            return bytes, rtt, ttl
-        # Fill in end
-        timeLeft = timeLeft - howLongInSelect
+        if stats[1] == 0:  # Echo Reply
+            delay = (timeReceived - time.time()) * 1000
+            return delay, stats
+        timeLeft -= howLongInSelect
         if timeLeft <= 0:
-            return "Request timed out."
+            return None, None
 
 
 def sendOnePing(mySocket, destAddr, ID):
@@ -101,10 +96,10 @@ def doOnePing(destAddr, timeout):
     mySocket = socket(AF_INET, SOCK_RAW, icmp)
 
     myID = os.getpid() & 0xFFFF  # Return the current process i
-    sendOnePing(mySocket, destAddr, myID)
-    delay = receiveOnePing(mySocket, myID, timeout, destAddr)
+    delay, statistics = sendOnePing(mySocket, destAddr, myID)
+    delay, statistics = receiveOnePing(mySocket, myID, timeout, destAddr)
     mySocket.close()
-    return delay
+    return delay, statistics
 
 
 def ping(host, timeout=1):
