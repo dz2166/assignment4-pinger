@@ -41,26 +41,26 @@ def receiveOnePing(mySocket, ID, timeout, destAddr):
 
     while True:
         startedSelect = time.time()
-        ready = select([mySocket], [], [], timeLeft)
+        whatReady = select.select([mySocket], [], [], timeLeft)
         howLongInSelect = (time.time() - startedSelect)
-        if ready[0] == []:  # Timeout
-            return None
-
+        if whatReady[0] == []:  # Timeout
+            return None, None  # Return default tuple values
         timeReceived = time.time()
         recPacket, addr = mySocket.recvfrom(1024)
 
         # Extract the ICMP header from the IP packet
         icmpHeader = recPacket[20:28]
-
-        # Unpack the header to get the type, code, checksum, and packet ID
         type, code, checksum, packetID, sequence = struct.unpack("bbHHh", icmpHeader)
-
         if packetID == ID:
-            return timeReceived - timeSent
+            bytesInDouble = struct.calcsize("d")
+            timeSent = struct.unpack("d", recPacket[28:28 + bytesInDouble])[0]
+            return (timeReceived - timeSent), addr[0]  # Return delay and address as a tuple
 
-        timeLeft -= howLongInSelect
+        timeLeft = timeLeft - howLongInSelect
         if timeLeft <= 0:
-            return None
+            return None, None  # Return default tuple values
+
+
 
 
 
