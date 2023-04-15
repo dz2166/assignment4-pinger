@@ -7,7 +7,6 @@ import select
 import binascii
 import pandas as pd
 import warnings
-import numpy as np
 
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
