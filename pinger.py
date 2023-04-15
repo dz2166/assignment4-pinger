@@ -96,14 +96,17 @@ def sendOnePing(mySocket, destAddr, ID):
 
 def doOnePing(destAddr, timeout):
     icmp = getprotobyname("icmp")
+
     # SOCK_RAW is a powerful socket type. For more details:   https://sock-raw.org/papers/sock_raw
     mySocket = socket(AF_INET, SOCK_RAW, icmp)
 
     myID = os.getpid() & 0xFFFF  # Return the current process i
-    sendOnePing(mySocket, destAddr, myID)
+    packet = create_packet(myID)
+    mySocket.sendto(packet, (destAddr, 1))  # Modified line
     delay = receiveOnePing(mySocket, myID, timeout, destAddr)
     mySocket.close()
     return delay
+
 
 def ping(host, timeout=1):
     # timeout=1 means: If one second goes by without a reply from the server,
