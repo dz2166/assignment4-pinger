@@ -41,27 +41,53 @@ def receiveOnePing(mySocket, ID, timeout, destAddr):
 
     while True:
         startedSelect = time.time()
-        whatReady = select.select([mySocket], [], [], timeLeft)
+        ready = select([mySocket], [], [], timeLeft)
         howLongInSelect = (time.time() - startedSelect)
-        if whatReady[0] == []:  # Timeout
-            return None, None  # Return default tuple values
+        if ready[0] == []:  # Timeout
+            return None, None, None
+
         timeReceived = time.time()
         recPacket, addr = mySocket.recvfrom(1024)
 
-        # Extract the ICMP header from the IP packet
+        # Fill in start
         icmpHeader = recPacket[20:28]
         type, code, checksum, packetID, sequence = struct.unpack("bbHHh", icmpHeader)
+
         if packetID == ID:
             bytesInDouble = struct.calcsize("d")
             timeSent = struct.unpack("d", recPacket[28:28 + bytesInDouble])[0]
-            return (timeReceived - timeSent), addr[0]  # Return delay and address as a tuple
+            rtt = (timeReceived - timeSent) * 1000
+            ttl = struct.unpack("B", recPacket[8:9])[0]
+            rtt_list = [rtt]
+            addr_list = [addr[0]]
+            ttl_list = [ttl]
+            
+            # Update this block of code to add the rtt value to the list
+            if rtt_list is not None:
+                rtt_list.append(rtt)
+            else:
+                rtt_list = [rtt]
+                
+            # Update this block of code to add the addr value to the list
+            if addr_list is not None:
+                addr_list.append(addr[0])
+            else:
+                addr_list = [addr[0]]
+                
+            # Update this block of code to add the ttl value to the list
+            if ttl_list is not None:
+                ttl_list.append(ttl)
+            else:
+                ttl_list = [ttl]
+                
+            # Use the max() function only if rtt_list is not None
+            max_rtt = max(rtt_list) if rtt_list is not None else None
+            # Fill in end
+            return max_rtt, addr_list, ttl_list
 
         timeLeft = timeLeft - howLongInSelect
         if timeLeft <= 0:
-            return None, None  # Return default tuple values
-
-
-
+            return None, None, None
 
 
 def sendOnePing(mySocket, destAddr, ID):
