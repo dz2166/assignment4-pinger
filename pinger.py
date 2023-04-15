@@ -39,31 +39,29 @@ def checksum(string):
 def receiveOnePing(mySocket, ID, timeout, destAddr):
     timeLeft = timeout
 
-    while 1:
+    while True:
         startedSelect = time.time()
-        whatReady = select.select([mySocket], [], [], timeLeft)
+        ready = select([mySocket], [], [], timeLeft)
         howLongInSelect = (time.time() - startedSelect)
-        if whatReady[0] == []:  # Timeout
-            return "Request timed out."
+        if ready[0] == []:  # Timeout
+            return None
 
         timeReceived = time.time()
         recPacket, addr = mySocket.recvfrom(1024)
 
-        # Fetch the ICMP header from the IP packet
+        # Extract the ICMP header from the IP packet
         icmpHeader = recPacket[20:28]
 
-        # Fill in start
+        # Unpack the header to get the type, code, checksum, and packet ID
         type, code, checksum, packetID, sequence = struct.unpack("bbHHh", icmpHeader)
-        if type != 8 and packetID == ID:
-            bytes = len(recPacket) - 28
-            rtt = (timeReceived - time.time()) * 1000
-            ttl = struct.unpack("B", recPacket[8:9])[0]
-            return bytes, rtt, ttl
 
-        # Fill in end
-        timeLeft = timeLeft - howLongInSelect
+        if packetID == ID:
+            return timeReceived - timeSent
+
+        timeLeft -= howLongInSelect
         if timeLeft <= 0:
-            return "Request timed out."
+            return None
+
 
 
 def sendOnePing(mySocket, destAddr, ID):
@@ -100,15 +98,11 @@ def doOnePing(destAddr, timeout):
     mySocket = socket(AF_INET, SOCK_RAW, icmp)
 
     myID = os.getpid() & 0xFFFF  # Return the current process i
-    sendOnePing(mySocket, destAddr, myID)
-    try:
-        delay = receiveOnePing(mySocket, myID, timeout, destAddr)
-    except Exception as e:
-        print(f"An error occurred: {e}")
-        delay = None
-    finally:
-        mySocket.close()
-        return delay
+    delay, addr = sendOnePing(mySocket, destAddr, myID)
+    delay = receiveOnePing(mySocket, myID, timeout, destAddr)
+    mySocket.close()
+    return delay
+
 
 
 def ping(host, timeout=1):
@@ -117,14 +111,16 @@ def ping(host, timeout=1):
     dest = gethostbyname(host)
     print("\nPinging " + dest + " using Python:")
     print("")
-    response = pd.DataFrame(columns=['bytes', 'rtt', 'ttl'])  # This creates an empty dataframe with 3 headers with the column specific names declared
-    delays = [] # create an empty list to store all the delays of each ping
+    response = pd.DataFrame(columns=['bytes', 'rtt',
+                                     'ttl'])  # This creates an empty dataframe with 3 headers with the column specific names declared
+    delays = []  # create an empty list to store all the delays of each ping
 
     # Send ping requests to a server separated by approximately one second
     for i in range(0, 4):  # Four pings will be sent (loop runs for i=0, 1, 2, 3)
         delay, statistics = doOnePing(dest, timeout)  # what is stored into delay and statistics?
-        delays.append(delay) # add each delay to the list delays
-        response = response.append({'bytes': statistics[0], 'rtt': statistics[1], 'ttl': statistics[2]}, ignore_index=True) # store your bytes, rtt, and ttle here in your response pandas dataframe
+        delays.append(delay)  # add each delay to the list delays
+        response = response.append({'bytes': statistics[0], 'rtt': statistics[1], 'ttl': statistics[2]},
+                                   ignore_index=True)  # store your bytes, rtt, and ttle here in your response pandas dataframe
         print(delay)
         time.sleep(1)  # wait one second
 
@@ -145,9 +141,11 @@ def ping(host, timeout=1):
     packet_max = round(max(delays), 2)
     stdev = round(statistics.stdev(delays), 2) if len(delays) > 1 else 0
     vars = pd.DataFrame(columns=['min', 'avg', 'max', 'stddev'])
-    vars = vars.append({'min': str(packet_min), 'avg': str(packet_avg), 'max': str(packet_max), 'stddev': str(stdev)}, ignore_index=True)
+    vars = vars.append({'min': str(packet_min), 'avg': str(packet_avg), 'max': str(packet_max), 'stddev': str(stdev)},
+                       ignore_index=True)
     print(vars)  # make sure your vars data you are returning resembles acceptance criteria
     return vars
+
 
 if __name__ == '__main__':
     ping("google.com")
