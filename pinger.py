@@ -66,26 +66,33 @@ def receiveOnePing(mySocket, ID, timeout, destAddr):
 
 def sendOnePing(mySocket, destAddr, ID):
     # Header is type (8), code (8), checksum (16), id (16), sequence (16)
-
     myChecksum = 0
+
     # Make a dummy header with a 0 checksum
     # struct -- Interpret strings as packed binary data
     header = struct.pack("bbHHh", ICMP_ECHO_REQUEST, 0, myChecksum, ID, 1)
+
     data = struct.pack("d", time.time())
-    # Calculate the checksum on the data and the dummy header.
+
+    # Calculate the checksum on the data and the dummy header
     myChecksum = checksum(header + data)
 
-    # Get the right checksum, and put in the header
+    # Get the right checksum and put in the header
     if sys.platform == 'darwin':
-        # Convert 16-bit integers from host to network  byte order
         myChecksum = htons(myChecksum) & 0xffff
     else:
         myChecksum = htons(myChecksum)
 
     header = struct.pack("bbHHh", ICMP_ECHO_REQUEST, 0, myChecksum, ID, 1)
-    packet = header + data
 
-    mySocket.sendto(packet, (destAddr, 1))  # AF_INET address must be tuple, not str
+    packet = header + data
+    sentTime = time.time()
+
+    # send packet using socket
+    mySocket.sendto(packet, (destAddr, 1))
+
+    return sentTime
+
 
 
 def doOnePing(destAddr, timeout):
